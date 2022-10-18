@@ -1,0 +1,105 @@
+\begin{appendix}
+\addappheadtotoc
+\section{Python Code Listing}
+\label{app_a}
+
+Here is an example of a python listing, you can change appearance of comments, strings, numbering, known commands and variables in the package settings in packages.tex. You can obviously use the listings environment in the rest of the document. The same procedure applies for listings in other languages.
+
+
+\vfill
+
+\begin{lstlisting}[language=Python, title=Python Listing Title]
+  ]
+# Python Script, API Version = V18
+
+import math
+
+#    DELETE EVERYTHING  -----------------------------
+
+ClearAll()
+
+#    PARAMETERS  --------------------------------------
+
+w = float(Parameters.w)      # side length of one element or half of a unit cell
+e = float(Parameters.e)      # rectangle ratio e
+b = w/(1+e)               
+rho = float(Parameters.rho)  # relative density
+f = float(Parameters.f)      # number of layers = folds+1
+h = 2*w/f          # layer height = size of a unit cell divided by the number of layers
+f = int(Parameters.f)
+
+# Calculation of wall thickness t
+t1 = ((math.sqrt(1-rho)+1)*math.sqrt(2)*w)/2
+t2 = -((math.sqrt(1-rho)-1)*math.sqrt(2)*w)/2
+if t1 <t2:
+  t=t1
+else:
+   t=t2
+   
+# auxiliary variable to build up rectangle
+m = math.sqrt(pow(t,2)*2)/2
+
+\end{lstlisting}
+
+
+\vfill
+
+\pagebreak
+
+
+\section{XMl Code Listing}
+Here is an example for XML code listing.
+\vfill
+
+\begin{lstlisting}[language=XML, title=XML Listing Title]
+<extension version="1" name="EnergyIntegral" loadasdefault="True">
+  <guid shortid="EnergyIntegral">8005c624-8869-4c74-b32b-97ac59c200b2</guid>                                  
+  <script src="energy_integral.py" />
+  <interface context="Mechanical">
+\end{lstlisting}
+
+\vfill
+
+
+\pagebreak
+
+
+\section{MATLAB Code Listing}
+Here is an example for MATLAB code listing
+
+\vfill
+
+\begin{lstlisting}[language=MATLAB,title=MATLAB Listing Title]
+%% Linear model Poly44 from MATLAB Curve Fit App:
+
+%Polynomial Coefficients (with 95\% confidence bounds):
+       p00 =       13.79;  %(13.22, 14.36)
+       p10 =      -2.897;  %(-3.454, -2.34)
+       p01 =       3.752;  %(3.163, 4.34)
+       p20 =       3.279;  %(2.231, 4.327)
+       p11 =      0.5404;  %(-0.2001, 1.281)
+       p02 =      0.8638;  %(-0.4624, 2.19)
+       p30 =       0.299;  %(0.01281, 0.5851)
+       p21 =     -0.5091;  %(-0.7299, -0.2884)
+       p12 =      0.4973;  %(0.2716, 0.7229)
+       p03 =      0.3595;  %(0.04484, 0.6741)
+       p40 =     -0.8495;  %(-1.291, -0.4084)
+       p31 =    -0.02258;  %(-0.3136, 0.2685)
+       p22 =     -0.2819;  %(-0.5502, -0.01351)
+       p13 =      0.2674;  %(-0.05265, 0.5874)
+       p04 =      0.2019;  %(-0.3968, 0.8006)
+       
+  	f(x,y) = p00 + p10*x + p01*y + p20*x^2 + p11*x*y + p02*y^2 + p30*x^3 + p21*x^2*y 
+  	+ p12*x*y^2 + p03*y^3 + p40*x^4 + p31*x^3*y + p22*x^2*y^2 
+  	+ p13*x*y^3 + p04*y^4
+
+  %Goodness of fit:
+  %SSE: 3.189
+  %R-square: 0.9949
+  %Adjusted R-square: 0.9902
+  %RMSE: 0.4611
+\end{lstlisting}
+
+\vfill
+
+\end{appendix}

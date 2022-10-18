@@ -1,0 +1,48 @@
+\section{Chapter 2}
+\subsection{Pseudo Code Environment Example}
+
+\begin{algorithm}
+
+    \setstretch{1.5}
+
+    \renewcommand{\thealgorithm}{}
+
+    \caption{PDE Constrained Shape Optimization in NGSolve}
+
+    \begin{algorithmic}[1]
+
+    \State \fun{resetDeformation}
+
+    \State \fun{initializeParameters} $\alpha$, $\beta$, $\gamma$ \Comment{Aug. Lag. weights for
+
+    $\mathrm{vol}(\Omega_{\mathrm{i}})$, $\mathrm{bc}_x(\Omega_{\mathrm{i}})$, $\mathrm{bc}_y(\Omega_{\mathrm{i}})$}
+
+    \For{$\mathrm{i} < \mathrm{iter}_{\mathrm{max}}$}
+
+        \State SolveStokes() \Comment{Solve Stokes on $\Omega_i$}
+
+        \State SolveDeformationEquation() \Comment{Solve Auxiliary Problem on $\Omega_i$, yields $X$}
+
+        \State Evaluate \fun{gfxbndnorm} = $ || X ||_{\mathrm{L}^2(\Gamma_{\infty , \mathrm{i}})} $
+
+        \State Evaluate \fun{ScalingParamter} = $ \frac{0.01}{|| X ||_{\mathrm{L}^2(\Omega_{\mathrm{i}})}} $
+
+        \If{\fun{gfxbndnorm} $<$ $\varepsilon$}
+
+            \State Increase $\alpha$, $\beta$, $\gamma$
+
+        \If{\fun{parametersTooBig}}
+
+            \State \fun{break}
+
+        \EndIf
+
+        \EndIf
+
+        \State Set $\Omega_{i+1}$ =  $\Omega_i - X \cdot$ \fun{ScalingParameter} \Comment{Gradient Descent Step}
+
+    \EndFor
+
+    \end{algorithmic}
+
+\end{algorithm}
