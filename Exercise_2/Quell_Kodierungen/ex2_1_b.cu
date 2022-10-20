@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "timer.hpp"
 
-
 __global__ void initVec(double *vec1, double *vec2, int N) {
 	unsigned int total_threads = blockDim.x * gridDim.x;
 	unsigned int global_tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -25,7 +24,6 @@ int main(void)
 		int N = N_values[k];
 		for (int n=0; n<5; n++) {
 			timer.reset();
-			cudaDeviceSynchronize();
 			x = (double*)malloc(N*sizeof(double));
 			y = (double*)malloc(N*sizeof(double));
 			cudaMalloc(&gpu_x, N*sizeof(double)); 
@@ -35,8 +33,6 @@ int main(void)
 			option_1 += timer.get();
 		}
 		printf("%d,%g\n", N, 0.2*option_1);
-		cudaMemcpy(x, gpu_x, N*sizeof(double), cudaMemcpyDeviceToHost);
-		cudaMemcpy(y, gpu_y, N*sizeof(double), cudaMemcpyDeviceToHost);
 		cudaFree(gpu_x);
 		cudaFree(gpu_y);
 		free(x);

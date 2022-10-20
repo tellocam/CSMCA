@@ -4,11 +4,10 @@
 int main(void)
 {
 	int k=0, i=8;
-	int N_values[i] = { 1000000, 2000000, 4000000, 8000000, 16000000, 32000000, 64000000, 128000000};
+	int N_values[i] = {1000000, 2000000, 4000000, 8000000, 16000000, 32000000, 64000000, 128000000};
 	double *gpu_x;
 	float t_malloc=0, t_free=0;
 	Timer timer;
-	cudaDeviceSynchronize();
 	printf("\nsize, malloc, free\n");
 	while(k < i) {
 		int N = N_values[k];
@@ -27,4 +26,3 @@ int main(void)
 	}
 	return EXIT_SUCCESS;
 }
-

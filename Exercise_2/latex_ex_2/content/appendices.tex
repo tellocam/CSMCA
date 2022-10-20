@@ -1,105 +1,396 @@
 \begin{appendix}
 \addappheadtotoc
-\section{Python Code Listing}
-\label{app_a}
+\section{CPP CUDA Code - Basic Cuda - Task 1a}
+\label{app_1a}
 
-Here is an example of a python listing, you can change appearance of comments, strings, numbering, known commands and variables in the package settings in packages.tex. You can obviously use the listings environment in the rest of the document. The same procedure applies for listings in other languages.
-
-
-\vfill
-
-\begin{lstlisting}[language=Python, title=Python Listing Title]
-  ]
-# Python Script, API Version = V18
-
-import math
-
-#    DELETE EVERYTHING  -----------------------------
-
-ClearAll()
-
-#    PARAMETERS  --------------------------------------
-
-w = float(Parameters.w)      # side length of one element or half of a unit cell
-e = float(Parameters.e)      # rectangle ratio e
-b = w/(1+e)               
-rho = float(Parameters.rho)  # relative density
-f = float(Parameters.f)      # number of layers = folds+1
-h = 2*w/f          # layer height = size of a unit cell divided by the number of layers
-f = int(Parameters.f)
-
-# Calculation of wall thickness t
-t1 = ((math.sqrt(1-rho)+1)*math.sqrt(2)*w)/2
-t2 = -((math.sqrt(1-rho)-1)*math.sqrt(2)*w)/2
-if t1 <t2:
-  t=t1
-else:
-   t=t2
-   
-# auxiliary variable to build up rectangle
-m = math.sqrt(pow(t,2)*2)/2
-
+\begin{lstlisting}[language=C++, title=C++ Listing]
+#include <stdio.h>
+#include "timer.hpp"
+int main(void)
+{
+	int k=0, i=8;
+	int N_values[i] = {1000000, 2000000, 4000000, 8000000, 16000000, 32000000, 64000000, 128000000};
+	double *gpu_x;
+	float t_malloc=0, t_free=0;
+	Timer timer;
+	printf("\nsize, malloc, free\n");
+	while(k < i) {
+		int N = N_values[k];
+		for (int n=0; n<5; n++) {
+			timer.reset();
+			cudaMalloc(&gpu_x, N*sizeof(double)); 
+			cudaDeviceSynchronize();
+			t_malloc += timer.get();
+			timer.reset();
+			cudaFree(gpu_x);
+			cudaDeviceSynchronize();
+			t_free += timer.get();
+		} 
+		printf("%d,%g,%g\n", N, 0.2*t_malloc, 0.2*t_free);
+		k++;
+	}
+	return EXIT_SUCCESS;
+}
 \end{lstlisting}
-
-
-\vfill
-
 \pagebreak
 
+\section{CPP CUDA Code - Basic Cuda - Task 1b}
+\label{app_1b}
+\begin{lstlisting}[language=C++, title=C++ Listing]
+#include <stdio.h>
+#include "timer.hpp"
 
-\section{XMl Code Listing}
-Here is an example for XML code listing.
-\vfill
+__global__ void initVec(double *vec1, double *vec2, int N) {
+	unsigned int total_threads = blockDim.x * gridDim.x;
+	unsigned int global_tid = blockIdx.x * blockDim.x + threadIdx.x;
+	
+	for (unsigned int i = global_tid; i<N; i += total_threads) {
+		vec1[i] = (double)(i);
+		vec2[i] = (double)(N-i-1);
+	}
+}
 
-\begin{lstlisting}[language=XML, title=XML Listing Title]
-<extension version="1" name="EnergyIntegral" loadasdefault="True">
-  <guid shortid="EnergyIntegral">8005c624-8869-4c74-b32b-97ac59c200b2</guid>                                  
-  <script src="energy_integral.py" />
-  <interface context="Mechanical">
+int main(void)
+{
+	int k=0, i=6;
+	int N_values[i] = { 1000000, 2000000, 4000000, 8000000, 16000000, 32000000 };
+	double *x, *y, *gpu_x, *gpu_y;
+	Timer timer;	
+	float option_1=0;
+	k = 0;
+	printf("\nsize,option1\n");
+	while(k < i) {
+		int N = N_values[k];
+		for (int n=0; n<5; n++) {
+			timer.reset();
+			x = (double*)malloc(N*sizeof(double));
+			y = (double*)malloc(N*sizeof(double));
+			cudaMalloc(&gpu_x, N*sizeof(double)); 
+			cudaMalloc(&gpu_y, N*sizeof(double));
+			initVec<<<256, 256>>>(gpu_x, gpu_y, N);
+			cudaDeviceSynchronize();
+			option_1 += timer.get();
+		}
+		printf("%d,%g\n", N, 0.2*option_1);
+		cudaFree(gpu_x);
+		cudaFree(gpu_y);
+		free(x);
+		free(y);
+		k++;		
+	}
+	float option_2=0;
+	k = 0;
+	printf("\nsize,option2\n");
+	while(k < i) {
+		int N = N_values[k];
+		for (int n=0; n<5; n++) {
+			timer.reset();
+			cudaDeviceSynchronize();
+			x = (double*)malloc(N*sizeof(double));
+			y = (double*)malloc(N*sizeof(double));
+			for (int i = 0; i < N; i++) {
+				x[i] = (double)(i);
+				y[i] = (double)(N-i-1);
+			}
+			cudaMalloc(&gpu_x, N*sizeof(double)); 
+			cudaMalloc(&gpu_y, N*sizeof(double));
+			cudaMemcpy(gpu_x, x, N*sizeof(double), cudaMemcpyHostToDevice);
+			cudaMemcpy(gpu_y, y, N*sizeof(double), cudaMemcpyHostToDevice);
+			cudaDeviceSynchronize();
+			option_2 += timer.get();
+		}
+		printf("%d,%g\n", N, 0.2*option_2);
+		cudaMemcpy(x, gpu_x, N*sizeof(double), cudaMemcpyDeviceToHost);
+		cudaMemcpy(y, gpu_y, N*sizeof(double), cudaMemcpyDeviceToHost);
+		cudaFree(gpu_x);
+		cudaFree(gpu_y);
+		free(x);
+		free(y);
+		k++;
+	}
+	return EXIT_SUCCESS;
+}
 \end{lstlisting}
-
-\vfill
-
-
 \pagebreak
 
+\section{CPP CUDA Code - Basic Cuda - Task 1c, 1d, 1e}
+\label{app_1cde}
+\begin{lstlisting}[language=C++, title=C++ Listing]
+#include <stdio.h>
+#include "timer.hpp"
+__global__ void addVec(double *x, double *y, double *z, int N) {
+	unsigned int total_threads = blockDim.x * gridDim.x;
+	unsigned int global_tid = blockIdx.x * blockDim.x + threadIdx.x;
+	for (unsigned int i = global_tid; i<N; i += total_threads) {
+		z[i] = x[i] + y[i];
+	}
+}
+int main(void)
+{
+	// Task c //
+	double *x, *y, *z, *gpu_x, *gpu_y, *gpu_z;
+	Timer timer;
+	int N = 100;
+	x = (double*)malloc(N*sizeof(double));
+	y = (double*)malloc(N*sizeof(double));
+	z = (double*)malloc(N*sizeof(double));
+	for (int i = 0; i < N; i++) {
+		x[i] = (double)(i);
+		y[i] = (double)(N-i-1);
+	}
+	cudaMalloc(&gpu_x, N*sizeof(double)); 
+	cudaMalloc(&gpu_y, N*sizeof(double));
+	cudaMalloc(&gpu_z, N*sizeof(double));
+	cudaMemcpy(gpu_x, x, N*sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(gpu_y, y, N*sizeof(double), cudaMemcpyHostToDevice);
+	addVec<<<256, 256>>>(gpu_x, gpu_y, gpu_z, N);
+	cudaMemcpy(z, gpu_z, N*sizeof(double), cudaMemcpyDeviceToHost);
+	cudaFree(gpu_x);
+	cudaFree(gpu_y);
+	cudaFree(gpu_z);
+	free(x);
+	free(y);
+	free(z);
 
-\section{MATLAB Code Listing}
-Here is an example for MATLAB code listing
-
-\vfill
-
-\begin{lstlisting}[language=MATLAB,title=MATLAB Listing Title]
-%% Linear model Poly44 from MATLAB Curve Fit App:
-
-%Polynomial Coefficients (with 95\% confidence bounds):
-       p00 =       13.79;  %(13.22, 14.36)
-       p10 =      -2.897;  %(-3.454, -2.34)
-       p01 =       3.752;  %(3.163, 4.34)
-       p20 =       3.279;  %(2.231, 4.327)
-       p11 =      0.5404;  %(-0.2001, 1.281)
-       p02 =      0.8638;  %(-0.4624, 2.19)
-       p30 =       0.299;  %(0.01281, 0.5851)
-       p21 =     -0.5091;  %(-0.7299, -0.2884)
-       p12 =      0.4973;  %(0.2716, 0.7229)
-       p03 =      0.3595;  %(0.04484, 0.6741)
-       p40 =     -0.8495;  %(-1.291, -0.4084)
-       p31 =    -0.02258;  %(-0.3136, 0.2685)
-       p22 =     -0.2819;  %(-0.5502, -0.01351)
-       p13 =      0.2674;  %(-0.05265, 0.5874)
-       p04 =      0.2019;  %(-0.3968, 0.8006)
-       
-  	f(x,y) = p00 + p10*x + p01*y + p20*x^2 + p11*x*y + p02*y^2 + p30*x^3 + p21*x^2*y 
-  	+ p12*x*y^2 + p03*y^3 + p40*x^4 + p31*x^3*y + p22*x^2*y^2 
-  	+ p13*x*y^3 + p04*y^4
-
-  %Goodness of fit:
-  %SSE: 3.189
-  %R-square: 0.9949
-  %Adjusted R-square: 0.9902
-  %RMSE: 0.4611
+	// Task d //
+	int k = 0;
+	int N_values[10] = { 100, 300, 1000, 3000, 10000, 30000, 100000, 300000, 1000000, 3000000 };
+	printf("\nsize,time\n");
+	while(k < 10) {
+		float t_kernel=0;
+		int N = N_values[k];
+		x = (double*)malloc(N*sizeof(double));
+		y = (double*)malloc(N*sizeof(double));
+		z = (double*)malloc(N*sizeof(double));
+		for (int i = 0; i < N; i++) {
+			x[i] = (double)(i);
+			y[i] = (double)(N-i-1);
+		}
+		cudaMalloc(&gpu_x, N*sizeof(double)); 
+		cudaMalloc(&gpu_y, N*sizeof(double));
+		cudaMalloc(&gpu_z, N*sizeof(double));
+		cudaMemcpy(gpu_x, x, N*sizeof(double), cudaMemcpyHostToDevice);
+		cudaMemcpy(gpu_y, y, N*sizeof(double), cudaMemcpyHostToDevice);
+		timer.reset();
+		for (int n=0; n<5; n++) {
+			addVec<<<256, 256>>>(gpu_x, gpu_y, gpu_z, N);
+			cudaDeviceSynchronize();
+		}
+		t_kernel += timer.get();
+		printf("%d,%g\n", N, 0.2*t_kernel);
+		cudaMemcpy(z, gpu_z, N*sizeof(double), cudaMemcpyDeviceToHost);
+		cudaFree(gpu_x);
+		cudaFree(gpu_y);
+		cudaFree(gpu_z);
+		free(x);
+		free(y);
+		free(z);
+		k++;
+	}
+	// Task e //
+	N = 10000000;
+	k = 0;
+	int params[7] = { 16, 32, 64, 128, 256, 512, 1024};
+	printf("\nsqrt(threads),time\n");
+	while(k < 7) {
+		float t_kernel=0;
+		int param = params[k];
+		x = (double*)malloc(N*sizeof(double));
+		y = (double*)malloc(N*sizeof(double));
+		z = (double*)malloc(N*sizeof(double));
+		for (int i = 0; i < N; i++) {
+			x[i] = (double)(i);
+			y[i] = (double)(N-i-1);
+		}
+		cudaMalloc(&gpu_x, N*sizeof(double)); 
+		cudaMalloc(&gpu_y, N*sizeof(double));
+		cudaMalloc(&gpu_z, N*sizeof(double));
+		cudaMemcpy(gpu_x, x, N*sizeof(double), cudaMemcpyHostToDevice);
+		cudaMemcpy(gpu_y, y, N*sizeof(double), cudaMemcpyHostToDevice);
+		timer.reset();
+		for (int n=0; n<5; n++) {
+			addVec<<<param, param>>>(gpu_x, gpu_y, gpu_z, N);
+			cudaDeviceSynchronize();
+		}
+		t_kernel += timer.get();
+		printf("%d,%g\n", param, 0.2*t_kernel);
+		cudaMemcpy(z, gpu_z, N*sizeof(double), cudaMemcpyDeviceToHost);
+		cudaFree(gpu_x);
+		cudaFree(gpu_y);
+		cudaFree(gpu_z);
+		free(x);
+		free(y);
+		free(z);
+		k++;
+	}
+	return EXIT_SUCCESS;
+}
 \end{lstlisting}
+\pagebreak
 
-\vfill
+\section{CPP CUDA Code - Dot Product - Task 2a}
+\label{app_2a}
+\begin{lstlisting}[language=C++, title=C++ Listing]
+#include <stdio.h>
+#include "timer.hpp"
+
+const int threads_per_block = 256;
+double dot_cpu(double *a, double *b, int N) {
+   double product = 0;
+   for (int i = 0; i < N; i++)
+   product = product + a[i] * b[i];
+   return product;
+}
+__global__ void dotVec_one(double *x, double *y, double *partial_z, int N) {
+	__shared__ double temp_arr[threads_per_block];
+	double thread_product = 0;
+	unsigned int global_tid = threadIdx.x + blockIdx.x * blockDim.x;
+	unsigned int local_tid  = threadIdx.x;
+	unsigned int total_threads = blockDim.x * gridDim.x;
+	for (unsigned int i=global_tid; i<N; i+=total_threads) {
+		thread_product += x[i] * y[i];
+	}
+	temp_arr[local_tid] = thread_product;
+	for (unsigned int stride = blockDim.x/2; stride>0; stride/=2) {
+		__syncthreads();
+		if (threadIdx.x < stride) {
+			temp_arr[threadIdx.x] += temp_arr[threadIdx.x + stride];
+		}
+	}
+	if (threadIdx.x == 0) {
+		partial_z[blockIdx.x] = temp_arr[0];
+	}
+}
+__global__ void dotVec_two(double *partial_z) {
+	for (int stride = blockDim.x/2; stride>0; stride/=2) {
+		__syncthreads();
+		if (threadIdx.x < stride)
+			partial_z[threadIdx.x] += partial_z[threadIdx.x+stride];
+	}
+}
+int main(void)
+{
+	// Task a //
+	double *x, *y, *z;
+	double *gpu_x, *gpu_y, *gpu_partial_z;
+	Timer timer;
+	int k = 0;
+	int N_values_d[10] = { 100, 300, 1000, 3000, 10000, 30000, 100000, 300000, 1000000, 3000000 };
+	printf("\nsize,time\n");
+	while(k < 10) {
+		int N = N_values_d[k];
+		x = (double*)malloc(N*sizeof(double));
+		y = (double*)malloc(N*sizeof(double));
+		z = (double*)malloc(threads_per_block*sizeof(double));
+		for (int i = 0; i < N; i++) {
+			x[i] = 1.0;
+			y[i] = 1.0;
+		}
+		cudaMalloc(&gpu_x, N*sizeof(double)); 
+		cudaMalloc(&gpu_y, N*sizeof(double));
+		cudaMalloc(&gpu_partial_z, threads_per_block*sizeof(double));
+		cudaMemcpy(gpu_x, x, N*sizeof(double), cudaMemcpyHostToDevice);
+		cudaMemcpy(gpu_y, y, N*sizeof(double), cudaMemcpyHostToDevice);
+		timer.reset();
+		for (int n=0; n<5; n++) { 
+			dotVec_one<<<256, threads_per_block>>>(gpu_x, gpu_y, gpu_partial_z, N);	
+			cudaDeviceSynchronize();
+			dotVec_two<<<1, threads_per_block>>>(gpu_partial_z);
+			cudaMemcpy(z, gpu_partial_z, threads_per_block*sizeof(double), cudaMemcpyDeviceToHost);
+		}
+		printf("%g,%g\n", z[0], 0.2*timer.get());
+		cudaFree(gpu_x);
+		cudaFree(gpu_y);
+		cudaFree(gpu_partial_z);
+		free(x);
+		free(y);
+		free(z);
+		k++;	
+	}
+	return EXIT_SUCCESS;
+}
+\end{lstlisting}
+\pagebreak
+
+\section{CPP CUDA Code - Dot Product - Task 2b}
+\label{app_2b}
+\begin{lstlisting}[language=C++, title=C++ Listing]
+#include <stdio.h>
+#include "timer.hpp"
+
+const int threads_per_block = 256;
+double dotVec_cpu(double *a, double *b, int N) {
+   double product = 0;
+   for (int i = 0; i < N; i++)
+   product = product + a[i] * b[i];
+   return product;
+}
+__global__ void dotVec_gpu(double *x, double *y, double *partial_z, int N) {
+	__shared__ double temp_arr[threads_per_block];
+	double thread_product = 0;
+	unsigned int global_tid = threadIdx.x + blockIdx.x * blockDim.x;
+	unsigned int local_tid  = threadIdx.x;
+	unsigned int total_threads = blockDim.x * gridDim.x;
+	for (unsigned int i=global_tid; i<N; i+=total_threads) {
+		thread_product += x[i] * y[i];
+	}
+	temp_arr[local_tid] = thread_product;
+	for (unsigned int stride = blockDim.x/2; stride>0; stride/=2) {
+		__syncthreads();
+		if (threadIdx.x < stride) {
+			temp_arr[threadIdx.x] += temp_arr[threadIdx.x + stride];
+		}
+	}
+	if (threadIdx.x == 0) {
+		partial_z[blockIdx.x] = temp_arr[0];
+	}
+}
+
+int main(void)
+{
+	// Task b //	
+	double *x, *y, z, *partial_z;
+	double *gpu_x, *gpu_y, *gpu_partial_z;
+	Timer timer;
+	int k = 0;
+	int N_values_d[10] = {100, 300, 1000, 3000, 10000, 30000, 100000, 300000, 1000000, 3000000};
+	printf("\nsize,time\n");
+	while(k < 10) {
+		int N = N_values_d[k];
+		x = (double*)malloc(N*sizeof(double));
+		y = (double*)malloc(N*sizeof(double));
+		partial_z = (double*)malloc(256*sizeof(double));
+		for (int i = 0; i < N; i++) {
+			x[i] = 1.0;
+			y[i] = 1.0;
+		}
+		cudaMalloc(&gpu_x, N*sizeof(double)); 
+		cudaMalloc(&gpu_y, N*sizeof(double));
+		cudaMalloc(&gpu_partial_z, 256*sizeof(double));
+		cudaMemcpy(gpu_x, x, N*sizeof(double), cudaMemcpyHostToDevice);
+		cudaMemcpy(gpu_y, y, N*sizeof(double), cudaMemcpyHostToDevice);
+		timer.reset();
+		for (int n=0; n<5; n++) {
+			dotVec_gpu<<<256, 256>>>(gpu_x, gpu_y, gpu_partial_z, N);
+			cudaMemcpy(partial_z, gpu_partial_z, 256*sizeof(double), cudaMemcpyDeviceToHost);
+			z = 0;
+			for(int i=0; i<256; i++) {
+				z += partial_z[i];
+			}
+		}
+		printf("%d,%g\n", N, 0.2*timer.get());
+		cudaFree(gpu_x);
+		cudaFree(gpu_y);
+		cudaFree(gpu_partial_z);
+		free(x);
+		free(y);
+		free(partial_z);
+		k++;
+	}
+	return EXIT_SUCCESS;
+}
+\end{lstlisting}
+\pagebreak
 
 \end{appendix}
+

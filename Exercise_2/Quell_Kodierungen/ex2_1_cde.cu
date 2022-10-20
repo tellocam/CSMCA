@@ -7,14 +7,12 @@ __global__ void addVec(double *x, double *y, double *z, int N) {
 		z[i] = x[i] + y[i];
 	}
 }
-
 int main(void)
 {
-	//Task c//
+	// Task c //
 	double *x, *y, *z, *gpu_x, *gpu_y, *gpu_z;
 	Timer timer;
 	int N = 100;
-	cudaDeviceSynchronize();
 	x = (double*)malloc(N*sizeof(double));
 	y = (double*)malloc(N*sizeof(double));
 	z = (double*)malloc(N*sizeof(double));
@@ -55,7 +53,6 @@ int main(void)
 		cudaMalloc(&gpu_z, N*sizeof(double));
 		cudaMemcpy(gpu_x, x, N*sizeof(double), cudaMemcpyHostToDevice);
 		cudaMemcpy(gpu_y, y, N*sizeof(double), cudaMemcpyHostToDevice);
-		cudaDeviceSynchronize();
 		timer.reset();
 		for (int n=0; n<5; n++) {
 			addVec<<<256, 256>>>(gpu_x, gpu_y, gpu_z, N);
@@ -70,11 +67,9 @@ int main(void)
 		free(x);
 		free(y);
 		free(z);
-		
 		k++;
 	}
-	
-	//Task e//
+	// Task e //
 	N = 10000000;
 	k = 0;
 	int params[7] = { 16, 32, 64, 128, 256, 512, 1024};
@@ -94,7 +89,6 @@ int main(void)
 		cudaMalloc(&gpu_z, N*sizeof(double));
 		cudaMemcpy(gpu_x, x, N*sizeof(double), cudaMemcpyHostToDevice);
 		cudaMemcpy(gpu_y, y, N*sizeof(double), cudaMemcpyHostToDevice);
-		cudaDeviceSynchronize();
 		timer.reset();
 		for (int n=0; n<5; n++) {
 			addVec<<<param, param>>>(gpu_x, gpu_y, gpu_z, N);
@@ -109,10 +103,8 @@ int main(void)
 		free(x);
 		free(y);
 		free(z);
-		
 		k++;
 	}
-
 	return EXIT_SUCCESS;
 }
 
