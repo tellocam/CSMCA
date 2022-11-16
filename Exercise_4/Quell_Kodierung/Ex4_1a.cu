@@ -6,8 +6,7 @@
 
 
 // result = (sum, abssum, squares, zero)
-__global__ void cuda_1a(int N, double *x, double *sum, double *abssum, double *squares, 
-double *zeros)
+__global__ void cuda_1a(int N, double *x, double *sum, double *abssum, double *squares, double *zeros)
 {
   __shared__ double shared_mem_sum[512];
   __shared__ double shared_mem_abssum[512];
@@ -50,8 +49,7 @@ double *zeros)
   }
 }
 
-/** Solve a system with `points_per_direction * points_per_direction` unknowns
- */
+
 int main() {
 
   int N = 1000000;

@@ -1,74 +1,78 @@
-\section{Multiple Dot Products (4 Points total)}
-\subsection{Task 2a}
-In this Section it was asked specifically to "write a Kernel", so that is what you will find below, just a Kernel without any useful implementation!
+#include "timer.hpp"
+#include "cuda_errchk.hpp"
+#include <algorithm>
+#include <cuda_runtime.h>
+#include <cublas_v2.h>
+#include <stdio.h>
+#include <cmath>
+#include <iostream>
+#include <vector>
+#include <numeric>
 
-\begin{lstlisting}[language=C++, title=C++ Cuda Code Kernel for 2a]
-__global__ void cuda_2a(int N, double *x, double *y, double *result)
+
+__global__ void cuda_task2(int N, double *x, double *y, double *results)
 {
-  __shared__ double shared_m1[256];
-  __shared__ double shared_m2[256];
-  __shared__ double shared_m3[256];
-  __shared__ double shared_m4[256];
-  __shared__ double shared_m5[256];
-  __shared__ double shared_m6[256];
-  __shared__ double shared_m7[256];
-  __shared__ double shared_m8[256];
- 
+  __shared__ double shared_mem1[256];
+  __shared__ double shared_mem2[256];
+  __shared__ double shared_mem3[256];
+  __shared__ double shared_mem4[256];
+  __shared__ double shared_mem5[256];
+  __shared__ double shared_mem6[256];
+  __shared__ double shared_mem7[256];
+  __shared__ double shared_mem8[256];
+
   double dot1=0, dot2=0, dot3=0, dot4=0, dot5=0, dot6=0, dot7=0, dot8=0;
+  double w;
+
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x) {
-    dot1 += x[i] * y[i];
-    dot2 += x[i] * y[i+N];
-    dot3 += x[i] * y[i+2*N];
-    dot4 += x[i] * y[i+3*N];
-    dot5 += x[i] * y[i+4*N];
-    dot6 += x[i] * y[i+5*N];
-    dot7 += x[i] * y[i+6*N];
-    dot8 += x[i] * y[i+7*N];
+    w = x[i];
+    dot1 += w * y[i];
+    dot2 += w * y[i+N];
+    dot3 += w * y[i+2*N];
+    dot4 += w * y[i+3*N];
+    dot5 += w * y[i+4*N];
+    dot6 += w * y[i+5*N];
+    dot7 += w * y[i+6*N];
+    dot8 += w * y[i+7*N];
   }
- 
-  shared_m1[threadIdx.x] = dot1;
-  shared_m2[threadIdx.x] = dot2;
-  shared_m3[threadIdx.x] = dot3;
-  shared_m4[threadIdx.x] = dot4;
-  shared_m5[threadIdx.x] = dot5;
-  shared_m6[threadIdx.x] = dot6;
-  shared_m7[threadIdx.x] = dot7;
-  shared_m8[threadIdx.x] = dot8;
+
+  shared_mem1[threadIdx.x] = dot1;
+  shared_mem2[threadIdx.x] = dot2;
+  shared_mem3[threadIdx.x] = dot3;
+  shared_mem4[threadIdx.x] = dot4;
+  shared_mem5[threadIdx.x] = dot5;
+  shared_mem6[threadIdx.x] = dot6;
+  shared_mem7[threadIdx.x] = dot7;
+  shared_mem8[threadIdx.x] = dot8;
+  
 
   for (int k = blockDim.x / 2; k > 0; k /= 2) {
     __syncthreads();
     if (threadIdx.x < k) {
-      shared_m1[threadIdx.x] += shared_m1[threadIdx.x + k];
-      shared_m2[threadIdx.x] += shared_m2[threadIdx.x + k];
-      shared_m3[threadIdx.x] += shared_m3[threadIdx.x + k];
-      shared_m4[threadIdx.x] += shared_m4[threadIdx.x + k];
-      shared_m5[threadIdx.x] += shared_m5[threadIdx.x + k];
-      shared_m6[threadIdx.x] += shared_m6[threadIdx.x + k];
-      shared_m7[threadIdx.x] += shared_m7[threadIdx.x + k];
-      shared_m8[threadIdx.x] += shared_m8[threadIdx.x + k];
+      shared_mem1[threadIdx.x] += shared_mem1[threadIdx.x + k];
+      shared_mem2[threadIdx.x] += shared_mem2[threadIdx.x + k];
+      shared_mem3[threadIdx.x] += shared_mem3[threadIdx.x + k];
+      shared_mem4[threadIdx.x] += shared_mem4[threadIdx.x + k];
+      shared_mem5[threadIdx.x] += shared_mem5[threadIdx.x + k];
+      shared_mem6[threadIdx.x] += shared_mem6[threadIdx.x + k];
+      shared_mem7[threadIdx.x] += shared_mem7[threadIdx.x + k];
+      shared_mem8[threadIdx.x] += shared_mem8[threadIdx.x + k];
     }
   }
- 
-  if (threadIdx.x == 0){
-    atomicAdd(&result[0], shared_m1[0]);
-    atomicAdd(&result[1], shared_m2[0]);
-    atomicAdd(&result[2], shared_m3[0]);
-    atomicAdd(&result[3], shared_m4[0]);
-    atomicAdd(&result[4], shared_m5[0]);
-    atomicAdd(&result[5], shared_m6[0]);
-    atomicAdd(&result[6], shared_m7[0]);
-    atomicAdd(&result[7], shared_m8[0]);
+
+  if (threadIdx.x == 0) 
+  {
+    atomicAdd(&results[0], shared_mem1[0]);
+    atomicAdd(&results[1], shared_mem2[0]);
+    atomicAdd(&results[2], shared_mem3[0]);
+    atomicAdd(&results[3], shared_mem4[0]);
+    atomicAdd(&results[4], shared_mem5[0]);
+    atomicAdd(&results[5], shared_mem6[0]);
+    atomicAdd(&results[6], shared_mem7[0]);
+    atomicAdd(&results[7], shared_mem8[0]);
   }
 }
-\end{lstlisting}
 
-\pagebreak
-
-\subsection{Task 2b}
-"Add a loop around that kernel to call it K/8 times to correctly compute the K dot products"
-This was achieved by adjusting the algorithm in the following way:
-
-\begin{lstlisting}[language=C++, title=C++ Cuda Code adaptation 2b]
 void Loop_function(int N, int K, double *x, double **y, double **results)
 {
     int h= K/8;
@@ -187,22 +191,27 @@ int main(void)
       for (size_t i=0; i<K/8; ++i) {
         cudaMemcpy(results3[i], cuda_results3[i], sizeof(double)*8, cudaMemcpyDeviceToHost);
       }
-\end{lstlisting}
 
-\pagebreak
+      //
+      // Clean up:
+      //
 
-\subsection{Task 2c}
+      free(x);
+      free(results);
+      cudaFree(cuda_x);
+      for (size_t i = 0; i < K / 8; ++i)
+      {
+          free(v[i]);
+          free(results3[i]);
+          cudaFree(cuda_v[i]);
+          cudaFree(cuda_results3[i]);
+      }
+      free(v);
+      free(results3);
+      cudaFree(cuda_v);
+      cudaFree(cuda_results3);
 
-In figure 1 below, the plot for task 2c.
-
-\begin{figure}[h]
-    \begin{center}
-        \includegraphics[width=15cm]{figures/task_2_c.pdf}
-        \caption{Execution Times of concurrent dot products for different $\mathrm{K}$ and $\mathrm{N}$}
-    \end{center}
-\end{figure}
-
-\subsection{Task 2d}
-
-By checking if k mod(8) is 0, if not find a scheme to additionally start another kernel for a single dot product to balance out, otherwise 
-proceed as before.
+      }
+  }
+    return EXIT_SUCCESS;
+}
