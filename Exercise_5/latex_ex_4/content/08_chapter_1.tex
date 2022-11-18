@@ -1,0 +1,103 @@
+\section{Dot Product with Warp Shuffles (3/4 Points)}
+
+\subsection{Task 1a}
+
+In The listing below see the code part for the Cuda Kernel for Exercise 4.1.a
+
+\begin{lstlisting}[language=C++, title=C++ Cuda Code for 1a Kernel]
+// result = (sum, abssum, squares, zero)
+__global__ void cuda_1a(int N, double *x, double *sum, double *abssum, double *squares, double *zeros)
+{
+  __shared__ double shared_mem_sum[512];
+  __shared__ double shared_mem_abssum[512];
+  __shared__ double shared_mem_squares[512];
+  __shared__ double shared_mem_zeros[512];
+
+  double sum_thr = 0;
+  double abssum_thr = 0;
+  double squares_thr = 0;
+  double zeros_thr = 0;
+
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x) {
+    sum_thr  += x[i];
+    abssum_thr += abs(x[i]);
+    squares_thr += pow(x[i],2);
+    zeros_thr += (double)x[i]==0;
+  }
+
+  shared_mem_sum[threadIdx.x] = sum_thr;
+  shared_mem_abssum[threadIdx.x] = abssum_thr;
+  shared_mem_squares[threadIdx.x] = squares_thr;
+  shared_mem_zeros[threadIdx.x] = zeros_thr;
+  
+  for (int k = blockDim.x / 2; k > 0; k /= 2) {
+    __syncthreads();
+    if (threadIdx.x < k) {
+      shared_mem_sum[threadIdx.x] += shared_mem_sum[threadIdx.x + k];
+      shared_mem_abssum[threadIdx.x] += shared_mem_abssum[threadIdx.x + k];
+      shared_mem_squares[threadIdx.x] += shared_mem_squares[threadIdx.x + k];
+      shared_mem_zeros[threadIdx.x] += shared_mem_zeros[threadIdx.x + k];
+    }
+  }
+
+  if (threadIdx.x == 0) {
+    atomicAdd(sum, shared_mem_sum[0]);
+    atomicAdd(abssum, shared_mem_abssum[0]);
+    atomicAdd(squares, shared_mem_squares[0]);
+    atomicAdd(zeros, shared_mem_zeros[0]);
+
+  }
+}
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Task 1b}
+In the b part of Exercise 1, the warpshuffles had to be made use of instead of the shared memory. See below the listing with the code snippet
+for the CUDA Kernel with warpshuffles.
+
+\begin{lstlisting}[language=C++, title=C++ Cuda Code for 1b Kernel]
+__global__ void cuda_1b(int N, double *x, double *sum, double *abssum, double *squares, double *zeros)
+{
+  double sum_thr = 0;
+  double abssum_thr = 0;
+  double squares_thr = 0;
+  double zeros_thr = 0;
+
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x) {
+    sum_thr  += x[i];
+    abssum_thr += abs(x[i]);
+    squares_thr += pow(x[i],2);
+    zeros_thr += (double)x[i]==0;
+  }
+
+  for (int i=warpSize/2; i>0; i=i/2){
+     sum_thr += __shfl_down_sync(-1, sum_thr, i);
+     abssum_thr += __shfl_down_sync(-1, abssum_thr, i);
+     squares_thr += __shfl_down_sync(-1, squares_thr, i);
+     zeros_thr += __shfl_down_sync(-1, zeros_thr, i);
+  }
+
+    if ((threadIdx.x &(warpSize-1))== 0) {
+    atomicAdd(sum, sum_thr);
+    atomicAdd(abssum, abssum_thr);
+    atomicAdd(squares, squares_thr);
+    atomicAdd(zeros, zeros_thr);
+    }
+  }
+\end{lstlisting}
+
+
+\subsection{Task 1c}
+
+In exercise 4.1.b, the same had to be done as before, but with warp shuffles only with one thread per entry. This can be done by changing
+the arguments of the Kernel invocation.
+
+\begin{lstlisting}[language=C++, title=C++ Cuda Code for 1c Kernel Invocation]
+    cuda_1c<<<((N+255)/256), 256>>>(N, cuda_x, cuda_sum, cuda_abssum, cuda_squares, cuda_zeros);
+\end{lstlisting}
+
+
+
+\pagebreak
+
