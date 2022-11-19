@@ -33,7 +33,7 @@ int main() {
 Timer timer;
 
 //Allocate and Initialize CPU Doubles
-int N = 1e6;
+int N = 1e7;
 double *x = (double *)malloc(sizeof(double));
 double *x_N = (double *)malloc(sizeof(double) * N);
 *x = 1;

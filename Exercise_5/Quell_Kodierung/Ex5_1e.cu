@@ -6,11 +6,21 @@
 
 __global__ void cuda_5_1c(double *x, double *y, double *z, int N)
 {
-  unsigned int total_threads = blockDim.x * gridDim.x;
-	unsigned int global_tid = blockIdx.x * blockDim.x + threadIdx.x;
-  for (unsigned int i = global_tid; i<N; i += total_threads) {
-		z[i] = x[i] + y[i];
-	}
+  float a = x[blockIdx.x*blockDim.x + threadIdx.x];
+  float b = y[blockIdx.x*blockDim.x + threadIdx.x];
+  float c;
+
+  for (int i = 0; i < 3000; i++) {
+    c += a * b;
+    c += a * b;
+    c += a * b;
+    c += a * b;
+    c += a * b;
+    c += a * b;
+    c += a * b;
+    c += a * b;
+  }
+  z[blockIdx.x*blockDim.x + threadIdx.x] += c;
 
 }
 
@@ -44,23 +54,24 @@ void fillVectorWithIndices(double *V, int N){
 
 int main() {
 
-int median_int = 20; // iterations to build median for timings
+int median_int = 100; // iterations to build median for timings
+int N_min = 10;
 int N_max = 28; // 2 to the N_max'th power is the largest vector for the bandwidth measurement
 
 Timer timer;
-std::vector<double> timings, peak_bw, N_vec;
-for (size_t i=0; i<=N_max; ++i){
+std::vector<double> timings, peak_flops, N_vec;
+for (size_t i=10; i<=N_max; ++i){
   N_vec.push_back(pow(2,i));
 }
 
 double *x, *y, *z, *gpu_x, *gpu_y, *gpu_z;
 
-std::cout << "Effective Bandwidth for varying Vector size addition: " << std::endl;
-std::cout << "N, " << "GB/s" << std::endl;
+std::cout << "Peak Floating Point rate: " << std::endl;
+std::cout << "N, " << "GFLOPs/s" << std::endl;
 
 
 //First For Loop to obtain Timings for varying N
-for (size_t i=0; i<N_max; ++i){
+for (size_t i=0; i<N_max-N_min; ++i){
 
   //prepare data on GPU and CPU for Kernel Submission
   x = (double*)malloc(N_vec[i]*sizeof(double));
@@ -91,13 +102,13 @@ for (size_t i=0; i<N_max; ++i){
   cudaMemcpy(z, gpu_z, N_vec[i]*sizeof(double), cudaMemcpyDeviceToHost);
 
   // obtain median timing for N_vec[i] from all timings_int iterations and clear timings vector for N_vec[i+1]
-  // 3 * floor((N - k_values[i])) * sizeof(double) * pow(10, -9) / findMedian(exec_timings, 10);
-  peak_bw.push_back((3*N_vec[i]*sizeof(double)*pow(10,-9))/findMedian(timings, median_int));
+
+  peak_flops.push_back((2*8*3000*N_vec[i]* pow(10, -9))/findMedian(timings, median_int));
   timings.clear();
 
-  // print N[i] and peak_bw[i] for copying it into csv later on :-)
+  // print N[i] and peak_flops[i] for copying it into csv later on :-)
 
-  std::cout << N_vec[i] << ", " << peak_bw[i] << std::endl;
+  std::cout << N_vec[i] << ", " << peak_flops[i] << std::endl;
 
   cudaFree(gpu_x);
   cudaFree(gpu_y);
@@ -105,6 +116,7 @@ for (size_t i=0; i<N_max; ++i){
   free(x);
   free(y);
   free(z);
+
 
 }
 return EXIT_SUCCESS;
