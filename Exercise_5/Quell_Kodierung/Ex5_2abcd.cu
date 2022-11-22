@@ -273,7 +273,7 @@ int main()
   Timer timer;
   std::vector<float> timings;
   timer.reset();
-  solve_system(1500);
+  solve_system(2000);
   float t = timer.get();
   printf("\nt = %f\n", t);
 
