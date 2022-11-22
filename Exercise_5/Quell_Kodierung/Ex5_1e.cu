@@ -10,14 +10,7 @@ __global__ void cuda_5_1c(double *x, double *y, double *z, int N)
   float b = y[blockIdx.x*blockDim.x + threadIdx.x];
   float c;
 
-  for (int i = 0; i < 3000; i++) {
-    c += a * b;
-    c += a * b;
-    c += a * b;
-    c += a * b;
-    c += a * b;
-    c += a * b;
-    c += a * b;
+  for (int i = 0; i < 8*3000; i++) {
     c += a * b;
   }
   z[blockIdx.x*blockDim.x + threadIdx.x] += c;
