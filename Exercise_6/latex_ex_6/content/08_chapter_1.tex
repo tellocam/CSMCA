@@ -1,0 +1,75 @@
+\section{Task1 : Inclusive and Exclusie Scan (0/4 Points)}
+\subsection{Describe the Workings of the Kernels (1 Point)}
+wtf is actually going on:
+scan kernel 1: 256x256
+scan within each block and calculate/reduce there
+calculate workperthread and use according indices of the vector
+do the reduction:
+we do inclusive reduction -> then have to use...
+fancy ternary oparator to write 0 first -> threadIdx == 0 -> write 0, all thread write values, except last one
+ 
+write back result in vector
+ 
+scan kernel 2: (1x 256)
+add all the results of the kernels
+1 block, 1 thread per block from (1)
+reduction over all the kernels
+write to output array accordingly again, s.t. we have exclusive scan
+-> 0 from threadIdx == 0, else write data at threadIdx-1
+ 
+scan kernel 3: (256x256)
+shared variable offset
+all the 0 threads of all blocks from (1):
+set offset as carries value from blockIdx
+add the offset to each value between blockstart and blockstop
+ we added all numbers together except the last one of the last thread
+
+
+
+
+\begin{algorithm}
+	\setstretch{1.5}
+	\renewcommand{\thealgorithm}{}
+	\caption{\texttt{scan\_kernel\_1}}
+	\begin{algorithmic}[1]
+    \State calculate \fun{work\_per\_thread} from \fun{N} \Comment{Yields indices of vector chunk interfaces}
+    \State scan within each block \Comment{Done by reduction}
+    \State Inclusive scan within each Buffer
+    
+    \State 
+    
+	\State \fun{resetDeformation}
+	\State \fun{initializeParameters} $\alpha$, $\beta$, $\gamma$ \Comment{Aug. Lag. weights for
+	$\mathrm{vol}(\Omega_{\mathrm{i}})$, $\mathrm{bc}_x(\Omega_{\mathrm{i}})$, $\mathrm{bc}_y(\Omega_{\mathrm{i}})$}
+	\For{$\mathrm{i} < \mathrm{iter}_{\mathrm{max}}$}
+		\State SolveStokes() \Comment{Solve Stokes on $\Omega_i$}
+		\State SolveDeformationEquation() \Comment{Solve Auxiliary Problem on $\Omega_i$, yields $X$}
+		\State Evaluate \fun{gfxbndnorm} = $ || X ||_{\mathrm{L}^2(\Gamma_{\infty , \mathrm{i}})} $
+		\State Evaluate \fun{ScalingParamter} = $ \frac{0.01}{|| X ||_{\mathrm{L}^2(\Omega_{\mathrm{i}})}} $
+		\If{\fun{gfxbndnorm} $<$ $\varepsilon$} 
+			\State Increase $\alpha$, $\beta$, $\gamma$
+		\If{\fun{parametersTooBig}}
+			\State \fun{break}
+		\EndIf
+		\EndIf
+		\State Set $\Omega_{i+1}$ =  $\Omega_i - X \cdot$ \fun{ScalingParameter} \Comment{Gradient Descent Step}
+	\EndFor
+	\end{algorithmic}
+\end{algorithm}
+
+\subsubsection*{scan\_kernel\_2}
+
+\subsubsection*{scan\_kernel\_3}
+\pagebreak
+\subsection{Provide an Implementation of Inclusive Scan (1 Point)}
+
+
+\pagebreak
+\subsection{Modify Exclusive Scan Code to Convert to Inclusive scan (1 Point)}
+
+
+\pagebreak
+\subsection{Compare Performances (1 Point)}
+
+
+\pagebreak
