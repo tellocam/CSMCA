@@ -217,8 +217,6 @@ __global__ void assembleA(int *row_offsets, int N, int M, int *col_indices, doub
   // if(threadIdx.x == 0 && blockIdx.x == 0) values[0] = 100;
 }
  
- 
- 
 /** Implementation of the conjugate gradient algorithm.
  *
  *  The control flow is handled by the CPU.

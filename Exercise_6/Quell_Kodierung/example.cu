@@ -12,7 +12,7 @@ __global__ void scan_kernel_1(double const *X,
 {
   __shared__ double shared_buffer[256];
   double my_value;
- 
+   
   unsigned int work_per_thread = (N - 1) / (gridDim.x * blockDim.x) + 1;
   unsigned int block_start = work_per_thread * blockDim.x *  blockIdx.x;
   unsigned int block_stop  = work_per_thread * blockDim.x * (blockIdx.x + 1);
