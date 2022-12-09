@@ -54,7 +54,7 @@ __global__ void cuda_dot_product(int N, double *x, double *y, double *result_par
 }
 
 // Pipelined CG Blue algorithm part (Algorithm-line 2 -line  4)
-__global__ void cuda_blue(int N, double *x, double *p, double *Ap, double *r, double r_ip double Alpha, double Beta)
+__global__ void cuda_blue(int N, double *x, double *p, double *Ap, double *r, double *r_ip, double Alpha, double Beta)
 {
   __shared__ double shared_memory[512];
   double partial_dot_product = 0;
@@ -73,8 +73,7 @@ __global__ void cuda_blue(int N, double *x, double *p, double *Ap, double *r, do
   for (int j = blockDim.x / 2; j > 0; j /= 2) {
     __syncthreads();
     if (threadIdx.x < j) {
-      shared_memory[threadIdx.x] += shared_memory[threadIdx.x + j];
-    }
+      shared_memory[threadIdx.x] += shared_memory[threadIdx.x + j];s
   }
   
   if (threadIdx.x == 0) r_ip[blockIdx.x] = shared_memory[0];
