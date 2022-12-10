@@ -79,8 +79,38 @@ __global__ void cuda_blue(int N, double *x, double *p, double *Ap, double *r, do
   if (threadIdx.x == 0) r_ip[blockIdx.x] = shared_memory[0];
 }
 
-// Pipelined CG Red algorithm part (Algorithm-line 5 and 6)
-__global__ void cuda_red(int N, int *csr_rowoffsets, int *csr_colindices, double *csr_values, double *p, double *Ap, double *partial_ApAp, double *partial_pAp){
+// Pipelined CG Red algorithm part (Algorithm-line 5 and 6) , bw_dot_ApAp and bw_dot_pAp are blockwise and need to be summed up on the CPU!
+__global__ void cuda_red(int N, int *csr_rowoffsets, int *csr_colindices, double *csr_values, double *p, double *Ap, double *bw_dot_ApAp, double *bw_dot_pAp){
+  __shared__ double sm_ApAp[512];
+  __shared__ double sm_pAp[512];
+  double dot_ApAp = 0;
+  double dot_pAp = 0;
+
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x) {
+    double sum = 0;
+    for (int k = csr_rowoffsets[i]; k < csr_rowoffsets[i + 1]; k++) {
+      sum += csr_values[k] * p[csr_colindices[k]];
+    }
+    Ap[i] = sum;
+    dot_ApAp += pow(sum,2);
+    dot_pAp += sum * p[i];
+  }
+
+  sm_ApAp[threadIdx.x] = dot_ApAp;
+  sm_pAp[threadIdx.x] = dot_pAp;
+  for (int k = blockDim.x / 2; k > 0; k /= 2) {
+    __syncthreads();
+    if (threadIdx.x < k) {
+      sm_ApAp[threadIdx.x] += sm_ApAp[threadIdx.x + k];
+      sm_pAp[threadIdx.x] += sm_pAp[threadIdx.x + k];
+    }
+  }
+  if (threadIdx.x == 0)
+  {
+    bw_dot_ApAp[blockIdx.x] = sm_ApAp[0];
+    bw_dot_pAp[blockIdx.x] = sm_pAp[0];
+  }
+
 
 }
  
