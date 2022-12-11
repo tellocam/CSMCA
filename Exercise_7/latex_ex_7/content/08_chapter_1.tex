@@ -1,3 +1,111 @@
-\section{Task1 : Inclusive and Exclusie Scan (1/4 Points)}
+\section{Pipelined Conjugate Gradients (5/5 Points)}
+\subsection{Implement the Algorithm (3/3 Points)}
+In the listings below the Kernels for the blue and red colored font from lecture slides 7a.
+The task was to only
+execute 2 Kernel call's per iteration, with these two Kernels, this can be achieved.
 
+\subsubsection{Blue Font Algorithm Part}
+\begin{lstlisting}[language=C++, title=Kernel for Blue Font Algorithm Part]
+__global__ void cuda_blue(int N, double *x, double *p, double *Ap, double *r, double *r_ip, double Alpha, double Beta)
+{
+  __shared__ double shared_memory[512];
+  double partial_dot_product = 0;
+
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x){
+    double p_thread = p[i];
+    double Ap_thread = Ap[i];
+    double r_thread = r[i] - Alpha * Ap_thread;
+    x[i] += Alpha * p_thread;
+    r[i] = r_thread;
+    p[i] = r_thread + Beta * p_thread;
+    partial_dot_product += r_thread *r_thread;
+  }
+  shared_memory[threadIdx.x] = partial_dot_product;
+  for (int j = blockDim.x / 2; j > 0; j /= 2) {
+    __syncthreads();
+    if (threadIdx.x < j) {
+      shared_memory[threadIdx.x] += shared_memory[threadIdx.x + j];
+  }
+  
+  if (threadIdx.x == 0) r_ip[blockIdx.x] = shared_memory[0];
+  }
+}
+\end{lstlisting}
+
+\pagebreak
+
+\subsubsection{Red Font Algorithm Part}
+\begin{lstlisting}[language=C++, title=Kernels for Red Algorithm Part]
+    __global__ void cuda_blue(int N, double *x, double *p, double *Ap, double *r, double *r_ip, double Alpha, double Beta)
+    {
+      __shared__ double shared_memory[512];
+      double partial_dot_product = 0;
+      for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x){
+        double p_thread = p[i];
+        double Ap_thread = Ap[i];
+        double r_thread = r[i] - Alpha * Ap_thread;
+        x[i] += Alpha * p_thread;
+        r[i] = r_thread;
+        p[i] = r_thread + Beta * p_thread;
+        partial_dot_product += r_thread *r_thread;
+      }
+      shared_memory[threadIdx.x] = partial_dot_product;
+      for (int j = blockDim.x / 2; j > 0; j /= 2) {
+        __syncthreads();
+        if (threadIdx.x < j) {
+          shared_memory[threadIdx.x] += shared_memory[threadIdx.x + j];
+      }
+      
+      if (threadIdx.x == 0) r_ip[blockIdx.x] = shared_memory[0];
+      }
+    }
+    \end{lstlisting}
+
+\pagebreak
+
+\subsubsection{Bringing Everything together}
+In the fuction \texttt{conjugate\_gradient\_pipelined()} we use both the Kernels from before and iterate till convergence.
+In order for this algorithm to work, it needs initial $\alpha_0$, $\beta_0$ and also an $Ap_0$, this is done before
+the actual iterations in the \fun{while(){}} loop. One can use the old functions from the last exercise like the dot product
+and the matrix vector product to obtain the two values and the vector. In the listing below shown the \fun{while(){}} loop that
+iterates till convergence.
+
+\begin{lstlisting}[language=C++, title=CG \fun{while(){}} loop]
+    int iters = 0;
+    cudaDeviceSynchronize();
+    timer.reset();
+    while (1) {
+      // Line 2-4 and partial of line 6, The blue colored part in the algorithm:
+      cuda_blue<<<blocks_lnch,thrds_block>>>(N, cuda_solution, cuda_p, cuda_Ap, cuda_r, cuda_ip_rr, alpha, beta);
+      // cudaMemcopy for blockwise inner product <r_i, r_i> for CPU calculations of alpha and beta
+      cudaMemcpy(bwip_rr, cuda_ip_rr, sizeof(double) * blocks_lnch, cudaMemcpyDeviceToHost);
+      // Line 5 and 6, the red colored part in the algorithm
+      cuda_red<<<blocks_lnch,thrds_block>>>(N, csr_rowoffsets, csr_colindices, csr_values, cuda_p, cuda_Ap, cuda_ip_ApAp, cuda_ip_pAp);
+      // cudaMemcopy for blockwise inner product <Ap_i, Ap_i> and <p_i, Ap_i> for CPU calculations of alpha and beta
+      cudaMemcpy(bwip_pAp, cuda_ip_pAp, sizeof(double) * blocks_lnch, cudaMemcpyDeviceToHost);
+      cudaMemcpy(bwip_ApAp, cuda_ip_ApAp, sizeof(double) * blocks_lnch, cudaMemcpyDeviceToHost);
+      // CPU summation of blockwise inner products.
+      ip_rr = bwip_rr[0];
+      ip_ApAp = bwip_ApAp[0];
+      ip_pAp = bwip_pAp[0];
+      for(size_t i=1; i<blocks_lnch; ++i)
+      {
+        ip_rr += bwip_rr[i];
+        ip_ApAp += bwip_ApAp[i];
+        ip_pAp += bwip_pAp[i];
+      }
+      //Check if convergence criterion is fulfilled.
+      if (std::sqrt(ip_rr / initial_residual_squared) < 1e-6) {
+        break;
+      }
+      // Computation of alpha and beta for next while iteration.
+      alpha = ip_rr / ip_pAp;
+      beta = ( alpha*alpha*ip_ApAp - ip_rr) / ip_rr;
+   
+      if (iters > 10000)
+        break; // solver didn't converge
+      ++iters;
+    }
+    \end{lstlisting}
+    
 \pagebreak

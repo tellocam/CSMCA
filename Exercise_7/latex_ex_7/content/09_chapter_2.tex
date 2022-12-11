@@ -1,2 +1,25 @@
-\section{Task 2: Finite Differences on the GPU (0/5 Points)}
+\subsection{Comparison of Pipelined CG and Classical CG on both GPU's (2/2 Points)}
+
+
+\subsubsection{CG Algorithm Performance on RTX3060}
+For this specific implementation, the runtime for the pipelined CG algorithm on the RTX3060 outperforms the classic one only for $\sqrt{\mathrm{N}}$ larger than approximately 300.
+After this point, the imporvements of the pipelined algorithm appear to be only minor. 
+\begin{figure}[h]
+    \begin{center}
+    \includegraphics[width=\linewidth]{figures/task_7_rtx_plot.pdf}
+    \caption{Elapsed time for Classical and Pipelined CG Algorithm on the RTX3060 GPU}
+    \end{center}
+\end{figure}
+
+\pagebreak
+
+\subsubsection{CG Algorithm Performance on Tesla K40}
+For this specific implementation, the runtime for the pipelined CG algorithm on the Tesla K40 outperforms the classic one only for $\sqrt{\mathrm{N}}$ larger than approximately 350.
+After this point, the imporvements of the pipelined algorithm appear to be only minor. 
+\begin{figure}[h]
+    \begin{center}
+    \includegraphics[width=\linewidth]{figures/task_7_k40_plot.pdf}
+    \caption{Elapsed time for Classical and Pipelined CG Algorithm on the Tesla K40 GPU}
+    \end{center}
+\end{figure}
 
