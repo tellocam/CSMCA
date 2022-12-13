@@ -76,7 +76,7 @@ int main()
   cl_platform_id platform_ids[42];   //no more than 42 platforms supported...
   err = clGetPlatformIDs(42, platform_ids, &num_platforms); OPENCL_ERR_CHECK(err);
   std::cout << "# Platforms found: " << num_platforms << std::endl;
-  cl_platform_id my_platform = platform_ids[0];
+  cl_platform_id my_platform = platform_ids[1];
 
 
   //
@@ -124,6 +124,7 @@ int main()
   //
   // Print compiler errors if there was a problem:
   //
+
   if (err != CL_SUCCESS) {
 
     char *build_log;
@@ -141,6 +142,7 @@ int main()
   //
   // Extract the only kernel in the program:
   //
+
   cl_kernel my_kernel = clCreateKernel(prog, "vec_add", &err); OPENCL_ERR_CHECK(err);
 
   std::cout << "Time to compile and create kernel: " << timer.get() << std::endl;
@@ -157,8 +159,8 @@ int main()
   
 
   // Set up outer for loop for different N
-  for(int N = 2; N <= 10e4; N *= 2){
-    
+  for(int N = 512; N < 10e8; N *= 2){
+    timer.reset();
     cl_uint vector_size = N;
     std::vector<ScalarType> x(vector_size, 1.0);
     std::vector<ScalarType> y(vector_size, 2.0);
@@ -167,21 +169,20 @@ int main()
     // std::cout << "Vectors before kernel launch:" << std::endl;
     // std::cout << "x: " << x[0] << " " << x[1] << " " << x[2] << " ..." << std::endl;
     // std::cout << "y: " << y[0] << " " << y[1] << " " << y[2] << " ..." << std::endl;
-    double t_0,t_1;
+
+    //
+    // Now set up OpenCL buffers:
+    //
+    cl_mem ocl_x = clCreateBuffer(my_context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, vector_size * sizeof(ScalarType), &(x[0]), &err); OPENCL_ERR_CHECK(err);
+    cl_mem ocl_y = clCreateBuffer(my_context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, vector_size * sizeof(ScalarType), &(y[0]), &err); OPENCL_ERR_CHECK(err);
+    double t_1;
 
     for(int j = 0; j <= 10; j++){
-
-      t_0 = timer.get();
-      //
-      // Now set up OpenCL buffers:
-      //
-      cl_mem ocl_x = clCreateBuffer(my_context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, vector_size * sizeof(ScalarType), &(x[0]), &err); OPENCL_ERR_CHECK(err);
-      cl_mem ocl_y = clCreateBuffer(my_context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, vector_size * sizeof(ScalarType), &(y[0]), &err); OPENCL_ERR_CHECK(err);
-
 
       //
       /////////////////////////// Part 4: Run kernel ///////////////////////////////////
       //
+      timer.reset();
       size_t  local_size = 128;
       size_t global_size = 128*128;
 
@@ -212,21 +213,22 @@ int main()
         dot_product += x[i];
       }
 
-      t_1 = timer.get() - t_0;
-
+      t_1 = timer.get();
       timings_iter.push_back(t_1);
     }
 
     N_timings.push_back(findMedian(timings_iter, 10));
+    std::cout << N  << ", " << findMedian(timings_iter, 10) <<  std::endl;
     timings_iter.clear();
+    clReleaseMemObject(ocl_x);
+    clReleaseMemObject(ocl_y);
 
-    // clReleaseMemObject(ocl_x);
-    // clReleaseMemObject(ocl_y);
-    clReleaseProgram(prog);
-    clReleaseCommandQueue(my_queue);
-    clReleaseContext(my_context);
 
 }
+
+  clReleaseProgram(prog);
+  clReleaseCommandQueue(my_queue);
+  clReleaseContext(my_context);
 
   // std::cout << std::endl;
   // std::cout << "Vectors after kernel execution:" << std::endl;
