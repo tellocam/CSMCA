@@ -23,16 +23,16 @@
 // Data container for simulation input - MUST NOT BE PORTED TO GPU
 //
 
-__device__ void CUDA_RNG(unsigned int seed, float* randomVector, int randomVectorLen) {
-  // Initialize the generator with the thread's unique seed value
-  unsigned int threadSeed = seed + blockIdx.x * blockDim.x + threadIdx.x;
+// __device__ void CUDA_RNG(unsigned int seed, float* randomVector, int randomVectorLen) {
+//   // Initialize the generator with the thread's unique seed value
+//   unsigned int threadSeed = seed + blockIdx.x * blockDim.x + threadIdx.x;
 
-  // Generate randomVectorLen of PRN
-  for (int i = 0; i < randomVectorLen; ++i) {
-    threadSeed = threadSeed * 1103515245 + 12345;
-    random_vector[i] = (float)threadSeed / (float)0x7fffffff;
-  }
-}
+//   // Generate randomVectorLen of PRN
+//   for (int i = 0; i < randomVectorLen; ++i) {
+//     threadSeed = threadSeed * 1103515245 + 12345;
+//     random_vector[i] = (float)threadSeed / (float)0x7fffffff;
+//   }
+// }
 
 __device__
 typedef struct
