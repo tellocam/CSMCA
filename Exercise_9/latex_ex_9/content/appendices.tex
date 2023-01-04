@@ -1,214 +1,204 @@
 \begin{appendix}
 \addappheadtotoc
-\section{CPP CUDA Code - Strided and Offset Memory Access - Task 1a}
+\section{CPP CODE for \fun{Boost.Compute} Library}
 \label{app_1a}
+\begin{lstlisting}[language=C++, title=CPP CODE for \fun{Boost.Compute} Library]  
+namespace compute = boost::compute;
 
-\begin{lstlisting}[language=C++, title=C++ Listing for EX1 a)]
-#include <stdio.h>
-#include "timer.hpp"
-#include <algorithm>
-#include <vector>
+BOOST_COMPUTE_FUNCTION(float, boost_multiplication, (float x, float y),
+                       {
+                           return x * y;
+                       });
 
-__global__ void addVec_kth(double *x, double *y, double *z, int N, int k) {
-	unsigned int total_threads = blockDim.x * gridDim.x;
-	unsigned int global_tid = blockIdx.x * blockDim.x + threadIdx.x;
-	if (k==0) {
-		k = 1;
-	}
-	for (unsigned int i = global_tid; i<N/k; i += total_threads) {
-		z[i*k] = x[i*k] + y[i*k];
-	}
-}
+BOOST_COMPUTE_FUNCTION(float, boost_addition, (float x, float y),
+                       {
+                           return x + y;
+                       });
 
-// findMedian function for any vector lenghts, source geeksforgeeks.com
-double findMedian(std::vector<double> a,
-                  int n)
+BOOST_COMPUTE_FUNCTION(float, boost_subtraction, (float x, float y),
+                       {
+                           return x - 2 * y;
+                       });
+int main(int argc, char *argv[])
 {
-    if (n % 2 == 0) {
-        std::nth_element(a.begin(),
-                    a.begin() + n / 2,
-                    a.end());
-        std::nth_element(a.begin(),
-                    a.begin() + (n - 1) / 2,
-                    a.end());
-        return (double)(a[(n - 1) / 2]
-                        + a[n / 2])
-               / 2.0;
+
+    int i, N, N_max, gentxt;
+    float dotP;
+    N_max = 100;
+    gentxt = 0;
+    for (i=1; i<argc&&argv[i][0]=='-'; i++) {
+    if (argv[i][1]=='N') i++, sscanf(argv[i],"%d",&N); // commandline arg -N for adjusting max. count, if none given N=100
+    if (argv[i][1]=='g') i++, sscanf(argv[i], "%d", &gentxt); // commandline arg. -g for generating a txt, if none given, no .txt NOT IMPLEMENTED
     }
-    else {
-        std::nth_element(a.begin(),
-                    a.begin() + n / 2,
-                    a.end());
-        return (double)a[n / 2];
-    }
+
+    // get default device and setup context
+    compute::device device = compute::system::default_device();
+    compute::context context(device);
+    compute::command_queue queue(context, device);
+    
+    // generate the 3 vectors: x=(1,1,...,1), y=(2,2,...,2) and dotp
+    std::vector<float> host_vector_x(N_max);
+    std::vector<float> host_vector_y(N_max);
+    std::vector<float> host_vector_prod(N_max);
+
+    std::fill(host_vector_x.begin(), host_vector_x.end(), 1.0);
+    std::fill(host_vector_y.begin(), host_vector_y.end(), 2.0);
+    
+    // create the 3 vectors on the device
+    compute::vector<float> device_vector_x(host_vector_x.size(), context);
+    compute::vector<float> device_vector_y(host_vector_y.size(), context);
+    compute::vector<float> device_vector_prod(host_vector_prod.size(), context);
+
+    // transfer data from the host to the device
+    compute::copy(host_vector_x.begin(), host_vector_x.end(), device_vector_x.begin(), queue);
+    compute::copy(host_vector_y.begin(), host_vector_y.end(), device_vector_y.begin(), queue);
+    
+    //calculate x+y within x
+    compute::transform(
+        device_vector_x.begin(),
+        device_vector_x.end(),
+        device_vector_y.begin(),
+        device_vector_x.begin(),
+        boost_addition,
+        queue
+    );
+
+    //calculate x-2*y within y
+    compute::transform(
+        device_vector_x.begin(),
+        device_vector_x.end(),
+        device_vector_y.begin(),
+        device_vector_y.begin(),
+        boost_subtraction,
+        queue
+    );
+    //after these two steps, vector x should have x_i + y_i in every entry, and vector y should have x_i - y_i in every entry and one can calculated the product in the thrid vector.
+
+    //calculate x_i * y_i
+    compute::transform(
+        device_vector_x.begin(),
+        device_vector_x.end(),
+        device_vector_y.begin(),
+        device_vector_prod.begin(),
+        boost_multiplication,
+        queue
+    );
+    //copy values back to the host
+    compute::copy(
+        device_vector_prod.begin(), device_vector_prod.end(), host_vector_prod.begin(), queue
+    );
+
+    dotP = std::accumulate(device_vector_prod.begin(), device_vector_prod.end(), 0);
+    std::cout << "<x+y, x-y> = " << dotP << " with N = " << N_max << std::endl;
+    
+    return 0;
 }
-
-int main(void)
-{
-	// Task 1a//
-	double *x, *y, *z, *gpu_x, *gpu_y, *gpu_z;
-	double eff_BW;
-	Timer timer;
-	int N = pow(10.0, 8.0);
-	std::vector<int> k_values(64, 0);
-	for(int i = 0; i<64; i++){
-		k_values[i] = i;
-	}
-	std::vector<double> exec_timings = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	x = (double*)malloc(N*sizeof(double));
-	y = (double*)malloc(N*sizeof(double));
-	z = (double*)malloc(N*sizeof(double));
-	for (int i = 0; i < N; i++) {
-		x[i] = (double)(i);
-		y[i] = (double)(N-i-1);
-	}
-	cudaMalloc(&gpu_x, N*sizeof(double)); 
-	cudaMalloc(&gpu_y, N*sizeof(double));
-	cudaMalloc(&gpu_z, N*sizeof(double));
-	cudaMemcpy(gpu_x, x, N*sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(gpu_y, y, N*sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(z, gpu_z, N*sizeof(double), cudaMemcpyDeviceToHost);
-
-	for (int i = 0; i < 64; i++) {
-		for (int m = 0; m < 11; m++) {
-			timer.reset();
-			addVec_kth<<<256, 256>>>(gpu_x, gpu_y, gpu_z, N, k_values[i]);
-			cudaDeviceSynchronize();
-			exec_timings[m] = timer.get();
-		}
-		if (k_values[i]==0) {
-			eff_BW = 3 * N * sizeof(double) * pow(10,-9) / findMedian(exec_timings, 10);
-		}
-		else{
-			eff_BW = 3 * floor((N/k_values[i])) * sizeof(double) * pow(10, -9) / findMedian(exec_timings, 10);
-		}
-		printf("%d,%g\n", k_values[i], eff_BW);
-	}
-
-	cudaFree(gpu_x);
-	cudaFree(gpu_y);
-	cudaFree(gpu_z);
-	free(x);
-	free(y);
-	free(z);
 \end{lstlisting}
 \pagebreak
 
-\section{CPP CUDA Code - Offset Memory Access - Task 1b}
-The code for the Offset Memory Access partial exercise is the same as for the
-Strided Memory Access partial exercise, except the \texttt{\_\_global\_\_} part where
-the offset is defined and the calculation of the effective bandwidth, where one can now
- also omit the case distinction for k=0.
-
-\null
-
+\section{CPP CODE for \fun{Thrust} Library}
 \label{app_1b}
-\begin{lstlisting}[language=C++, title=C++ Listing for EX1 b)]
-__global__ void addVec_kth(double *x, double *y, double *z, int N, int k) {
-	unsigned int total_threads = blockDim.x * gridDim.x;
-	unsigned int global_tid = blockIdx.x * blockDim.x + threadIdx.x;
-	if (k==0) {
-		k = 1;
-	}
-	for (unsigned int i = global_tid; i<N-k; i += total_threads) {
-		z[i+k] = x[i+k] + y[i+k];
-	}
+\begin{lstlisting}[language=C++, title=CPP CODE for \fun{Thrust} Library]
+int main(int argc, char *argv[]) {
+  int i, N, N_max, gentxt;
+  float dotP;
+  N_max = 100;
+  gentxt = 0;
+  for (i=1; i<argc&&argv[i][0]=='-'; i++) {
+  if (argv[i][1]=='N') i++, sscanf(argv[i],"%d",&N); // commandline arg -N for adjusting max. count, if none given N=100
+  if (argv[i][1]=='g') i++, sscanf(argv[i], "%d", &gentxt); // commandline arg. -g for generating a txt, if none given, no .txt NOT IMPLEMENTED
+  }
+
+  // generate vectors on host of lenght N_max
+  thrust::host_vector<float> h_x(N_max);
+  thrust::host_vector<float> h_y(N_max);
+  thrust::host_vector<float> h_prod1(N_max);
+  thrust::host_vector<float> h_prod2(N_max);
+  thrust::fill(h_x.begin(), h_x.end(), 1);
+  thrust::fill(h_y.begin(), h_y.end(), 2);
+  thrust::fill(h_prod1.begin(), h_prod1.end(), 0);
+  thrust::fill(h_prod2.begin(), h_prod2.end(), 0);
+
+  // transfer data to the device
+  thrust::device_vector<float> d_x = h_x;
+  thrust::device_vector<float> d_y = h_y;
+  thrust::device_vector<float> d_prod1 = h_prod1;
+  thrust::device_vector<float> d_prod2 = h_prod2;
+
+  thrust::transform(d_x.begin(), d_x.end(), d_y.begin(), d_prod1.begin(), thrust::plus<float>());
+  thrust::transform(d_x.begin(), d_x.end(), d_y.begin(), d_prod2.begin(), thrust::minus<float>());
+  thrust::transform(d_prod1.begin(), d_prod1.end(), d_prod2.begin(),d_prod1.begin(), thrust::multiplies<float>());
+
+
+  // transfer data back to host
+  thrust::copy(d_prod1.begin(), d_prod1.end(), h_prod1.begin());
+  dotP = std::accumulate(d_prod1.begin(), d_prod1.end(), 0);
+
+  std::cout << "<x+y, x-y> = " << dotP << " with N = " << N_max << std::endl;
+
+  return 0;
 }
-
-.
-.
-.
-
-eff_BW = 3 * floor((N - k_values[i])) * sizeof(double) * pow(10, -9) / findMedian(exec_timings, 10);
-
-.
-.
-.
-
 \end{lstlisting}
 
 \pagebreak
 
-\section{CPP CUDA Code - Dense Matrix Transpose - Task 2b}
-\label{app_2b}
-
-\begin{lstlisting}[language=C++, title=C++ Listing for EX2 b and c]
-#include <stdio.h>
-#include <iostream>
-#include "timer.hpp"
-#include "cuda_errchk.hpp"   // for error checking of CUDA calls
-
-__global__
-void transpose(double *A, double *B, int N)
-{
-  int t_idx = blockIdx.x*blockDim.x + threadIdx.x;
-  int row_idx = t_idx / N;
-  int col_idx = t_idx % N;
-  
-  if (row_idx < N && col_idx < N) B[row_idx * N + col_idx] = A[col_idx * N + row_idx];
-}
-
-
-void print_A(double *A, int N)
-{
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; ++j) {
-      std::cout << A[i * N + j] << ", ";
-    }
-    std::cout << std::endl;
-  }
-}
-
-int main(void)
-{
-  int N = 10;
-
-  double *A, *cuda_A, *B, *cuda_B;
-  Timer timer;
-
-  // Allocate host memory and initialize
-  A = (double*)malloc(N*N*sizeof(double));
-  B = (double*)malloc(N*N*sizeof(double));
-  
-  for (int i = 0; i < N*N; i++) {
-    A[i] = i;
+\section{CPP CODE for \fun{VexCL} Library}
+\label{app_1c}
+\begin{lstlisting}[language=C++, title=CPP CODE for \fun{VexCL} Library]
+int main(int argc, char *argv[]) {
+  int i, N, N_max, gentxt;
+  double dotP;
+  N_max = 100;
+  gentxt = 0;
+  for (i=1; i<argc&&argv[i][0]=='-'; i++) {
+  if (argv[i][1]=='N') i++, sscanf(argv[i],"%d",&N); // commandline arg -N for adjusting max. count, if none given N=100
+  if (argv[i][1]=='g') i++, sscanf(argv[i], "%d", &gentxt); // commandline arg. -g for generating a txt, if none given, no .txt NOT IMPLEMENTED
   }
 
-  print_A(A, N);
+  vex::Context ctx(vex::Filter::GPU && vex::Filter::DoublePrecision);
+
+  std::cout << ctx << std::endl; // print list of selected devices
+
+  std::vector<double> x(N_max, 1.0), y(N_max, 2.0), prod(N_max, 0);
+
+  vex::vector<double> X(ctx, x);
+  vex::vector<double> Y(ctx, y);
+
+  vex::vector<double> F1 = X + Y;
+  vex::vector<double> F2 = X - Y;
+  vex::vector<double> P = F1 * F2;
+
+  dotP = std::accumulate(P.begin(), P.end(), 0);
+  std::cout << "<x+y, x-y> = " << dotP << " with N = " << N_max << std::endl;
+
+  return 0; 
+}
+\end{lstlisting}
+\pagebreak
 
 
-  // Allocate device memory and copy host data over
-  CUDA_ERRCHK(cudaMalloc(&cuda_A, N*N*sizeof(double))); 
-  CUDA_ERRCHK(cudaMalloc(&cuda_B, N*N*sizeof(double))); 
+\section{CPP CODE for \fun{ViennaCL} Library}
+\label{app_1d}
+\begin{lstlisting}[language=C++, title=CPP CODE for \fun{ViennaCL} Library]
+int main(int argc, char *argv[]) {
+  int i, N, N_max, gentxt;
+  double dotP;
+  N_max = 100;
+  gentxt = 0;
+  for (i=1; i<argc&&argv[i][0]=='-'; i++) {
+  if (argv[i][1]=='N') i++, sscanf(argv[i],"%d",&N); // commandline arg -N for adjusting max. count, if none given N=100
+  if (argv[i][1]=='g') i++, sscanf(argv[i], "%d", &gentxt); // commandline arg. -g for generating a txt, if none given, no .txt NOT IMPLEMENTED
+  }
 
-  // copy data over
-  CUDA_ERRCHK(cudaMemcpy(cuda_A, A, N*N*sizeof(double), cudaMemcpyHostToDevice));
+  viennacl::vector<double> x = viennacl::scalar_vector<double>(N_max, 1.0);
+  viennacl::vector<double> y = viennacl::scalar_vector<double>(N_max, 2.0);
 
-  // wait for previous operations to finish, then start timings
-  CUDA_ERRCHK(cudaDeviceSynchronize());
-  timer.reset();
+  viennacl::vector<double> f1 = x + y;
+  viennacl::vector<double> f2 = x - y;
+  viennacl::vector<double> p = viennacl::linalg::element_prod(f1,f2);
 
-  // Perform the transpose operation
-  transpose<<<(N*N+255)/256, 256>>>(cuda_A, cuda_B, N);
-
-  // wait for kernel to finish, then print elapsed time
-  CUDA_ERRCHK(cudaDeviceSynchronize());
-  double elapsed = timer.get();
-  std::cout << std::endl << "Time for transpose: " << elapsed << std::endl;
-  std::cout << "Effective bandwidth: " << (2*N*N*sizeof(double)) / elapsed * 1e-9 << " GB/sec" << std::endl;
-  std::cout << std::endl;
-
-  // copy data back (implicit synchronization point)
-  CUDA_ERRCHK(cudaMemcpy(B, cuda_B, N*N*sizeof(double), cudaMemcpyDeviceToHost));
-
-  print_A(B, N);
-
-  cudaFree(cuda_A);
-  cudaFree(cuda_B);
-  free(A);
-  free(B);
-
-  CUDA_ERRCHK(cudaDeviceReset());  // for CUDA leak checker to work
+  dotP = std::accumulate(p.begin(), p.end(), 0);
+  std::cout << "<x+y, x-y> = " << dotP << " with N = " << N_max << std::endl;
 
   return EXIT_SUCCESS;
 }
