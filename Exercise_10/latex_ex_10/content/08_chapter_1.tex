@@ -1,12 +1,323 @@
-\section{DIVOC Simulator (0 / 7+2 Points)}
-\subsection{Generate Random Numbers for GPU (0/1 Point)}
+\section{DIVOC Simulator (2 / 7+2 Points)}
+\subsection{Generate Random Numbers for GPU (1/1 Point)}
 
-\subsection{RNG on GPU (0/1 Point)}
+
+In order to save time I have already started with implementing this subtask as
+part of the 2 next subtasks. I will write this only in pseudocode.
+
+\begin{algorithm}
+	\setstretch{1.5}
+	\renewcommand{\thealgorithm}{}
+	\caption{CPU Based Random Number Generator}
+	\begin{algorithmic}[1]
+	\State define \fun{Number\_of\_threads}
+    \State define Random \fun{Seed} \Comment{E.g. from Entropy Pool or just 4 ;-)}
+    \State call function \fun{LCGRNG(Seed)} \Comment{Function that does 1 step of LCG RNG}
+    \State initialize vector \fun{RN} of length equal to \fun{Number\_of\_threads}
+    \State \fun{RN[0] = seed}
+    \For {\fun{i} = 1; \fun{i} $\le$ \fun{Number\_of\_threads}-1; \fun{i++} }
+        \State \fun{RN[i]} = \fun{LCRNG(RN[i-1])}
+    \EndFor
+	\end{algorithmic}
+\end{algorithm}
+
+This vector \fun{RN} can now be used by the GPU such that every thread has its own random number.
+
+
+\subsection{RNG on GPU (1/1 Point)}
+The following code snippet shows a \texttt{\_\_device\_\_} function that can be called by other \fun{\_\_global\_\_} cuda funtions.
+This functions generates takes the thread ID as seed for a standard linear congruential random number generator and does
+one iteration of the LCGRNG. The performance difference to the CPU implementation is quite simple. In order to
+generate 
+
+\begin{lstlisting}[language=C++, title=C++ code for ]
+__device__ u_int32_t cuda_LCG(int thread_id, u_int32_t *rand_nr_vec){
+    u_int32_t seed = rand_nr_vec[thread_id];
+    u_int32_t m    = pow(2,31) - 1;
+    u_int32_t a    = 48271;
+    u_int32_t rnr  = (a * seed) % m; 
+    rand_nr_vec[thread_id] = rnr;
+    return rnr;
+    }
+    
+    __global__ void cuda_RN(int N, u_int32_t *random_nr_vec, int rand_iters) {
+    int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+    for (int i = 0; i < rand_iters; i++){
+        u_int32_t kebap = cuda_LCG(thread_id, random_nr_vec);
+    }
+    }
+\end{lstlisting}
+
+The performance difference is that the algorithm of part a), a for loop had to go through LCGRNG for \fun{Nummber\_of\_threads}
+times, whereas in this algorithm, every thread perfoms one step concurrently.
 
 \section{Port DIVOC Simulator to GPU (0/4 Points)}
-\subsection{Port Init. Phase to GPU (0/2 Points)}
 
-\subsection{Port Sim. Phase to GPU (0/2 Points)}
+Unfortunately wasnt able to make it run. Number of infected ppl was always zero, might be something wrong with the
+random numbers. I spent at least 5 hrs on it.. so 0 points would be devastating but okay I guess :(
+
+\begin{lstlisting}[language=C++, title=C++ code for ]
+
+void init_input(SimInput_t *input) 
+{
+  input->population_size = 8916845;  // Austria's population in 2020 according to Statistik Austria
+ 
+  input->mask_threshold      = 5000;
+  input->lockdown_threshold  = 50000;
+  input->infection_delay     = 5;     // 5 to 6 days incubation period (average) according to WHO
+  input->infection_days      = 3;     // assume three days of passing on the disease
+  input->starting_infections = 10;
+  input->immunity_duration   = 180;   // half a year of immunity
+ 
+  input->contacts_per_day = (int*)malloc(sizeof(int) * DAYS_DIVOC);
+  input->transmission_probability = (double*)malloc(sizeof(double) * DAYS_DIVOC);
+  for (int day = 0; day < DAYS_DIVOC; ++day) {
+    input->contacts_per_day[day] = 6;             // arbitrary assumption of six possible transmission contacts per person per day, all year
+    input->transmission_probability[day] = 0.2
+                                           + 0.1 * cos((day / DAYS_DIVOC) * 2 * M_PI);   // higher transmission in winter, lower transmission during summer
+  }
+}
+ 
+__global__ void cuda_init_input(SimInput_t *input, int *cpd, double *tp) {
+    input->population_size = 8916845;  // Austria's population in 2020 according to Statistik Austria
+    
+    input->mask_threshold      = 5000;
+    input->lockdown_threshold  = 50000;
+    input->infection_delay     = 5;     // 5 to 6 days incubation period (average) according to WHO
+    input->infection_days      = 3;     // assume three days of passing on the disease
+    input->starting_infections = 10;
+    input->immunity_duration   = 180;   // half a year of immunity
+
+    input->contacts_per_day = cpd;
+    input->transmission_probability = tp;
+
+    for (int day = blockIdx.x*blockDim.x + threadIdx.x; day < 365; day += gridDim.x*blockDim.x) {
+        input->contacts_per_day[day] = 6;             // arbitrary assumption of six possible transmission contacts per person per day, all year
+        input->transmission_probability[day] = 0.2
+                                            + 0.1 * cos((day / 365.0) * 2 * M_PI);   // higher transmission in winter, lower transmission during summer
+    }
+}
+
+__global__ void cuda_print(SimInput_t *input) {
+    printf("Threshold: %d \n", input->mask_threshold);
+}
+
+typedef struct
+{
+  // for each day:
+  int *active_infections;     // number of active infected on that day (including incubation period)
+  int *lockdown;              // 0 if no lockdown on that day, 1 if lockdown
+ 
+  // for each person:
+  int *is_infected;      // 0 if healty, 1 if currently infected
+  int *infected_on;      // day of infection. negative if not yet infected. January 1 is Day 0.
+ 
+} SimOutput_t;
+ 
+//
+// Initializes the output data structure (values to zero, allocate arrays)
+//
+
+void init_output(SimOutput_t *output, int population_size)
+{
+  output->active_infections = (int*)malloc(sizeof(int) * DAYS_DIVOC);
+  output->lockdown          = (int*)malloc(sizeof(int) * DAYS_DIVOC);
+  for (int day = 0; day < DAYS_DIVOC; ++day) {
+    output->active_infections[day] = 0;
+    output->lockdown[day] = 0;
+  }
+ 
+  output->is_infected       = (int*)malloc(sizeof(int) * population_size);
+  output->infected_on       = (int*)malloc(sizeof(int) * population_size);
+ 
+  for (int i=0; i<population_size; ++i) {
+    output->is_infected[i] = 0;
+    output->infected_on[i] = 0;
+  }
+}
+
+__global__ void cuda_init_output(SimOutput_t *output, SimInput_t *input, int *ai, int *ld, int *ii, int *io) {
+    output->active_infections = ai;
+    output->lockdown          = ld;
+     for (int day = blockIdx.x*blockDim.x + threadIdx.x; day < 365; day += gridDim.x*blockDim.x) {
+        output->active_infections[day] = 0;
+        output->lockdown[day] = 0;
+    }
+    output->is_infected       = ii;
+    output->infected_on       = io;
+    
+    for (int i = blockIdx.x*blockDim.x + threadIdx.x; i < input->population_size; i += gridDim.x*blockDim.x) {
+        output->is_infected[i] = (i < input->starting_infections) ? 1 : 0;
+        output->infected_on[i] = (i < input->starting_infections) ? 0 : -1;
+    }
+}
+
+__global__ void cuda_print_out(SimOutput_t *output) {
+    printf("Infected: %d \n", output->is_infected[0]);
+}
+
+__global__ void cuda_determine_infections(const SimInput_t *input, SimOutput_t *output, int *numInfected, int *numRecovered, int day) {
+    // Step 1: determine number of infections and recoveries
+    int num_infected_current = 0;
+    int num_recovered_current = 0;
+    __shared__ int shared_inf[256];
+    __shared__ int shared_rec[256];
+
+    for (int i = blockIdx.x*blockDim.x + threadIdx.x; i < input->population_size; i += gridDim.x*blockDim.x) {
+        if (output->is_infected[i] > 0) {
+            if (output->infected_on[i] > day - input->infection_delay - input->infection_days
+            && output->infected_on[i] <= day - input->infection_delay)   // currently infected and incubation period over
+            {
+                num_infected_current += 1;
+                // printf("person %d is infected on day %d (info in thread %d in block %d)\n", i, day, threadIdx.x, blockIdx.x);
+            }
+            else if (output->infected_on[i] < day - input->infection_delay - input->infection_days)
+            {
+                num_recovered_current += 1;
+                // printf("person %d is recovered on day %d (info in thread %d in block %d)\n", i, day);
+            }
+        }
+    }
+
+    shared_inf[threadIdx.x] = num_infected_current;
+    shared_rec[threadIdx.x] = num_recovered_current;
+    for(unsigned int stride = blockDim.x/2; stride > 0 ; stride/=2){
+        __syncthreads();
+        if(threadIdx.x < stride){
+            shared_inf[threadIdx.x] += shared_inf[threadIdx.x + stride];
+            shared_rec[threadIdx.x] += shared_rec[threadIdx.x + stride];
+        }
+    }
+    if (threadIdx.x == 0) {
+        numInfected[blockIdx.x] = shared_inf[0];
+        numRecovered[blockIdx.x] = shared_rec[0];
+    }
+}
+
+// reduction between blocks
+__global__ void cuda_reduction(int *input) { 
+    __shared__ int shared_mem[256];
+    shared_mem[threadIdx.x] = input[threadIdx.x];
+    for(unsigned int stride = blockDim.x/2; stride > 0; stride/=2){
+        __syncthreads(); // synchronize threads within thread block
+        if(threadIdx.x < stride){
+            shared_mem[threadIdx.x] += shared_mem[threadIdx.x + stride];
+        }
+    }
+    if(threadIdx.x == 0) input[0] = shared_mem[0];
+}
+
+__global__ void cuda_lockdown(const SimInput_t *input, SimOutput_t *output, int *numInfected, int day) {
+
+        if (numInfected[0] > input->lockdown_threshold) {
+            output->lockdown[day] = 1;
+        }
+        if (day > 0 && output->lockdown[day-1] == 1) { // end lockdown if number of infections has reduced significantly
+            output->lockdown[day] = (numInfected[0] < input->lockdown_threshold / 3) ? 0 : 1;
+        }
+}
+
+__global__ void cuda_adjust_params(const SimInput_t *input, SimOutput_t *output, int *numInfected, int day) {
+
+    if (numInfected[0] > input->mask_threshold) { // transmission is reduced with masks. Arbitrary factor: 2
+        input->transmission_probability[day] /= 2.0;
+    }
+    if (output->lockdown[day]) { // contacts are significantly reduced in lockdown. Arbitrary factor: 4
+        input->contacts_per_day[day] /= 4;
+    }
+}
+
+__global__ void cuda_pass_infection(const SimInput_t *input, SimOutput_t *output, u_int32_t *cuda_rand, int day){
+    // if(threadIdx.x < 10 && blockIdx.x == 0) printf("check if infectious: person = %d, yes/no = %d\n", threadIdx.x, output->is_infected[threadIdx.x]);
+    for (int i = blockIdx.x*blockDim.x + threadIdx.x; i < input->population_size; i += gridDim.x*blockDim.x)  // loop over population
+    {
+        if (   output->is_infected[i] > 0
+            && output->infected_on[i] >  day - input->infection_delay - input->infection_days  // currently infected
+            && output->infected_on[i] <= day - input->infection_delay)                         // already infectious
+        {
+            // printf("person %d is infectious on day %d (info in thread %d in block %d)\n", i, day, threadIdx.x, blockIdx.x);
+            // pass on infection to other persons with transmission probability
+            for (int j=0; j<input->contacts_per_day[day]; ++j) 
+            {
+                double r = cuda_rand[i] / 2147483647; 
+                if (r < input->transmission_probability[day]) {
+
+                    r = cuda_rand[i*j] / 2147483647;
+                    int other_person = r * input->population_size;
+                    if (output->is_infected[other_person] == 0     // other person is not infected
+                    || output->infected_on[other_person] < day - input->immunity_duration) { // other person has no more immunity
+                        output->is_infected[other_person] = 1;
+                        output->infected_on[other_person] = day;
+                    }
+                }
+            } // for contacts_per_day
+        } // if currently infected
+    } // for i
+}
+ 
+ 
+void run_simulation(const SimInput_t *input, SimOutput_t *output) {
+    
+    // Step 1
+    //
+    int *cuda_numInfected, *cuda_numRecovered;
+    CUDA_ERRCHK(cudaMalloc(&cuda_numInfected, sizeof(int)*256));
+    CUDA_ERRCHK(cudaMalloc(&cuda_numRecovered, sizeof(int)*256));
+    int *numRecovered = (int*)malloc(sizeof(int) * 256);
+    int *numInfected = (int*)malloc(sizeof(int) * 256);
+
+
+    int population_size;//, contacts_per_day;
+    cudaMemcpy(&population_size, &input->population_size, sizeof(int), cudaMemcpyDeviceToHost);
+
+    // random number vector 
+    u_int32_t *cuda_rand; 
+    cudaMalloc(&cuda_rand, sizeof(u_int32_t) * 256 * 256);
+
+    for (int day=0; day< DAYS_DIVOC; ++day)
+    {
+        printf("day %d\n", day);
+        // get todays infected
+        cudaDeviceSynchronize();
+        cuda_determine_infections<<<256,256>>>(input, output, cuda_numInfected, cuda_numRecovered, day);
+        cudaDeviceSynchronize();
+        cuda_reduction<<<1,256>>>(cuda_numInfected);
+        cudaDeviceSynchronize();
+        cuda_reduction<<<1,256>>>(cuda_numRecovered);
+        cudaDeviceSynchronize();
+        int infected;
+        cudaMemcpy(numInfected, cuda_numInfected, sizeof(int),cudaMemcpyDeviceToHost);
+        infected = numInfected[0];
+        printf("Infected on day %d: %d\n", day, numInfected[0]);
+
+        // check for lockdown
+        cuda_lockdown<<<1,1>>>(input, output, cuda_numInfected, day);
+        cudaDeviceSynchronize();
+        //
+        // Step 2: determine today's transmission probability and contacts based on pandemic situation
+        //
+        cuda_adjust_params<<<1,1>>>(input, output, cuda_numInfected, day);
+        cudaDeviceSynchronize();
+
+        //
+        // Step 3: pass on infections within population
+        //
+    
+        cuda_RN<<<256,256>>>(cuda_rand, day);
+
+        cudaDeviceSynchronize();
+
+        cuda_pass_infection<<<256,256>>>(input, output, cuda_rand, day);
+        cudaDeviceSynchronize();
+
+    } // for day
+}
+
+\end{lstlisting}
+
+\subsection{Port Init. Phase to GPU (4/4 Points)}
+
+
 
 \section{Develop Performance Model and Compare to Execution Times (0/1 Point)}
 

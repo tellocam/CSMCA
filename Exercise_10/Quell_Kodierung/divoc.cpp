@@ -17,7 +17,7 @@
   #define M_PI  3.14159265358979323846
 #endif
 
-#define DAYS_DIVOC 10
+#define DAYS_DIVOC 150
  
 //
 // Data container for simulation input

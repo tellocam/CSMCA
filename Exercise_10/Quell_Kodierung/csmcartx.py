@@ -30,8 +30,8 @@
 import requests
 import sys
 
-#url = 'https://k40.360252.org/2022/ex8/run.php'
-url = 'https://rtx3060.360252.org/2022/ex8/run.php'
+#url = 'https://k40.360252.org/2022/ex10/run.php'
+url = 'https://rtx3060.360252.org/2022/ex10/run.php'
 
 
 # Check whether a source file has been passed:
